@@ -64,8 +64,9 @@ versions the engine and the window share one process.
 
 ## How it works
 
-The TK-MS029 receiver (`VID_25A7 PID_FA61`) sends standard events: the side buttons are XBUTTON1/XBUTTON2
-and the thumb wheel is a horizontal wheel (`WM_MOUSEHWHEEL`, ±120 per notch).
+The TK-MS029 works through its USB receiver (`VID_25A7 PID_FA61`) or over Bluetooth (`VID 0x25A7 PID 0xFAA0`).
+It sends standard events: the side buttons are XBUTTON1/XBUTTON2 and the thumb wheel is a horizontal
+wheel (`WM_MOUSEHWHEEL`, ±120 per notch).
 
 A low-level mouse hook (`WH_MOUSE_LL`) catches these events, and Raw Input tells which device sent each
 one. Events from the Tecknet run the action from the active profile. Events from any other mouse are sent
@@ -81,8 +82,9 @@ Settings are saved automatically to `%APPDATA%\TecknetRemap\config.json`.
 - `profiles["*"]` is *All applications*. `profiles["brave.exe"]` and so on override only what they list.
 - Actions: `default`, `none`, `mouse:x1|x2|middle|hleft|hright`, `keys:ctrl+shift+t`,
   `run:C:\path\program.exe`.
-- `device_match`: substring of the HID device name to remap (default `VID_25A7&PID_FA61`). Another mouse
-  that sends standard side-button events should work if you change this.
+- `device_match`: list of substrings of the HID device names to remap. Default:
+  `VID_25A7&PID_FA61` (USB receiver) and `VID&0225A7_PID&FAA0` (Bluetooth). Another mouse that sends
+  standard side-button events should work if you add its ID here.
 - `debug: true` writes a log to `%APPDATA%\TecknetRemap\remap.log`.
 
 ## Known limitations

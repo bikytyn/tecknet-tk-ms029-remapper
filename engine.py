@@ -279,17 +279,35 @@ def device_name(h):
     return buf.value
 
 
-def device_present(match):
+def device_matches(name, match):
+    """match = podřetězec nebo seznam podřetězců názvu zařízení (USB přijímač, Bluetooth…)."""
+    pats = [match] if isinstance(match, str) else list(match or [])
+    low = name.lower()
+    return any(p and p.lower() in low for p in pats)
+
+
+def connected_mice(match):
+    """Názvy připojených myší, které odpovídají match."""
     n = W.UINT(0)
     sz = ctypes.sizeof(RAWINPUTDEVICELIST)
     u32.GetRawInputDeviceList(None, ctypes.byref(n), sz)
     arr = (RAWINPUTDEVICELIST * n.value)()
     cnt = u32.GetRawInputDeviceList(arr, ctypes.byref(n), sz)
-    m = match.lower()
+    out = []
     for i in range(min(cnt, n.value)):
-        if arr[i].dwType == RIM_TYPEMOUSE and m in device_name(arr[i].hDevice).lower():
-            return True
-    return False
+        if arr[i].dwType == RIM_TYPEMOUSE:
+            name = device_name(arr[i].hDevice)
+            if device_matches(name, match):
+                out.append(name)
+    return out
+
+
+def device_present(match):
+    return bool(connected_mice(match))
+
+
+def is_bluetooth(name):
+    return "{00001812-0000-1000-8000-00805f9b34fb}" in name.lower()  # služba HID over GATT
 
 
 # ---------------------------------------------------------------- engine
@@ -525,7 +543,7 @@ class Engine:
         h = hdr.hDevice
         if h not in self.dev_cache:
             name = device_name(h)
-            self.dev_cache[h] = self.cfg.get("device_match", "").lower() in name.lower()
+            self.dev_cache[h] = device_matches(name, self.cfg.get("device_match", ""))
             self.log(f"device {name} target={self.dev_cache[h]}")
         target = self.dev_cache[h]
         if target and not (m.usFlags & 0x1) and (m.lLastX or m.lLastY):  # jen relativní pohyb

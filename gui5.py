@@ -120,6 +120,13 @@ class App(gui4.App):
         self._wsv = WS.read_all()  # aktuální nastavení myši ve Windows (pro souhrny na kartách)
         super().__init__()
         self.engine = RemoteEngine()   # nahradí lokální jádro z gui2/gui4
+        self.root.after(5000, self._dev_tick)
+
+    def _dev_tick(self):
+        """Stav připojení myši (USB / Bluetooth) v hlavičce – myš se může připojit i odpojit kdykoli."""
+        if self.root.state() != "withdrawn":
+            self._update_dev_label()
+        self.root.after(5000, self._dev_tick)
 
     def app_name(self, exe):
         # okno nastavení samo běží jako pythonw.exe – uživateli ukázat název programu, ne interpretu
@@ -158,8 +165,13 @@ class App(gui4.App):
         pass
 
     def _update_dev_label(self):
-        ok = E.device_present(self.cfg.get("device_match", ""))
-        self.dev_lbl.configure(text=t("dev_ok") if ok else t("dev_missing"), fg=self.T["ok"] if ok else self.T["warn"])
+        mice = E.connected_mice(self.cfg.get("device_match", ""))
+        if mice:
+            kinds = sorted({t("conn_bt") if E.is_bluetooth(m) else t("conn_usb") for m in mice})
+            text = f"{t('dev_ok')} ({', '.join(kinds)})"
+        else:
+            text = t("dev_missing")
+        self.dev_lbl.configure(text=text, fg=self.T["ok"] if mice else self.T["warn"])
 
     # ================================================================ rychlejší levý panel
     def refresh_apps(self):

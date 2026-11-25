@@ -25,7 +25,9 @@ DEFAULT_CFG = {
     "version": 1,
     "enabled": True,
     # podřetězec názvu HID zařízení (Raw Input), které se přemapovává
-    "device_match": "VID_25A7&PID_FA61",
+    # podřetězce názvu HID zařízení (Raw Input), která se přemapovávají:
+    # USB přijímač a Bluetooth (BLE HID: „VID&02xxxx_PID&yyyy“)
+    "device_match": ["VID_25A7&PID_FA61", "VID&0225A7_PID&FAA0"],
     "debug": False,
     "profiles": {
         GLOBAL: {
@@ -96,6 +98,8 @@ def load_config():
         for k, v in user.items():
             if k != "profiles":
                 cfg[k] = v
+        if cfg.get("device_match") == "VID_25A7&PID_FA61":  # starý výchozí (jen USB) -> i Bluetooth
+            cfg["device_match"] = list(DEFAULT_CFG["device_match"])
         profs = user.get("profiles") or {}
         for exe, p in profs.items():
             cfg["profiles"].setdefault(exe, {}).update(p)
