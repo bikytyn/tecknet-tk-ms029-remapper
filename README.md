@@ -7,7 +7,7 @@ per application, with a settings window in the style of Logitech Options+.
 Only the Tecknet mouse is remapped. Other mice connected at the same time (a Logitech, for example) keep
 working as before.
 
-![Settings window: photo of the mouse with a card for each control, the thumb wheel lit up after being rolled up, and its action list on the right](docs/screenshot-main.png)
+![Settings window: photo of the mouse with a card for each control, the thumb wheel lit up after being rolled up, and its action list on the right](docs/window-mouse.png)
 
 ## Features
 
@@ -32,11 +32,11 @@ working as before.
 
 Clicking the scroll wheel or the left & right button card opens its Windows settings in the right panel:
 
-![Scroll wheel settings: lines per notch, page scrolling, scrolling inactive windows, horizontal scroll speed](docs/screenshot-wheel.png)
+![Scroll wheel settings: lines per notch, page scrolling, scrolling inactive windows, horizontal scroll speed](docs/window-wheel-settings.png)
 
 The *More settings* tab has pointer speed, pointer size and pointer schemes, including installing new pointer packs:
 
-![More settings tab: pointer speed and acceleration, pointer size, pointer schemes with previews](docs/screenshot-more.png)
+![More settings tab: pointer speed and acceleration, pointer size, pointer schemes with previews](docs/window-more-settings.png)
 
 ## Requirements
 
