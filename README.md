@@ -28,8 +28,6 @@ working as before.
   (no admin rights needed).
 - English and Czech interface, light and dark theme (follows Windows), tray icon, start with Windows.
 
-## Screenshots
-
 Clicking the scroll wheel or the left & right button card opens its Windows settings in the right panel:
 
 ![Scroll wheel settings: lines per notch, page scrolling, scrolling inactive windows, horizontal scroll speed](docs/window-wheel-settings.png)
