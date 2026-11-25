@@ -146,6 +146,7 @@ WM_APP_RELOAD = WM_APP + 6   # znovu načíst config.json
 WM_APP_MEASURE = WM_APP + 7  # wParam 1 = začít, 0 = skončit (výsledek jde UDP zprávou „measure“)
 WM_APP_ANCHOR = WM_APP + 8   # wParam = stupeň DPI
 WM_APP_STATUS = WM_APP + 9   # pošli stav sledování DPI
+WM_APP_IDENTIFY = WM_APP + 10  # rozpoznání myši: další boční tlačítko / palcové kolečko -> UDP „identify“ s názvem
 TIMER_SAVE = 3
 GUI_MUTEX = "Local\\TecknetRemapGui"
 TRACK_PATH = os.path.join(C.CFG_DIR, "dpi_track.json")
@@ -326,6 +327,8 @@ class Engine:
         self.tracker = None      # DpiTracker – pasivní sledování stupně DPI
         self.gui_port = None     # UDP port okna nastavení (samostatný proces)
         self._stepper = None     # audio.VolumeStepper – vlastní krok hlasitosti
+        self.identifying = False  # rozpoznání myši stiskem (výběr zařízení v okně)
+        self._ident_until = 0.0
         self._sock = None
         self.pending = deque()  # (key, payload, t)
         self.raws = deque()     # (key, is_target, t)
@@ -499,6 +502,9 @@ class Engine:
                     self.save_tracker()
                     self.send_gui("dpi_status", self.tracker.status())
                 return 0
+            elif msg == WM_APP_IDENTIFY:
+                self.identifying = bool(wp)
+                return 0
             elif msg == WM_APP_STATUS:
                 if self.tracker:
                     self.send_gui("dpi_status", self.tracker.status())
@@ -558,6 +564,10 @@ class Engine:
                     self.notify("dpi", new)
         if not (f & 0x3C0 or f & 0x800):
             return
+        if self.identifying and (f & 0x140 or f & 0x800):  # stisk X1/X2 nebo palcové kolečko
+            self.identifying = False
+            self._ident_until = time.monotonic() + 0.6  # tuhle událost nepřemapovat (jen rozpoznání)
+            self.send_gui("identify", device_name(h))
         t = time.monotonic()
         for bit, key in ((0x40, ("x1", True)), (0x80, ("x1", False)),
                          (0x100, ("x2", True)), (0x200, ("x2", False)), (0x800, "h")):
@@ -594,7 +604,7 @@ class Engine:
             send([_mouse_input(MOUSEEVENTF_XDOWN if down else MOUSEEVENTF_XUP, 1 if btn == "x1" else 2)])
 
     def _handle(self, key, payload, target):
-        if not target:
+        if not target or time.monotonic() < self._ident_until:
             self._reinject(key, payload)
             return
         exe = foreground_exe()

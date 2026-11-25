@@ -15,8 +15,9 @@ import config as C
 import engine as E
 import gui4
 import i18n as L
+import devices as DV
 import winsettings as WS
-from gui2 import Switch, bind_tree, rrect, set_bg_tree
+from gui2 import ScrollList, Switch, bind_tree, rrect, set_bg_tree
 from gui3 import Slider
 
 t = L.t
@@ -142,6 +143,8 @@ class App(gui4.App):
                 self.cfg = C.load_config()
                 self.cfg.setdefault("app_info", {})
                 self.sw_enabled.set(self.cfg.get("enabled", True))
+            elif kind == "identify" and args:
+                self._on_identify(args[0])
             elif kind in ("show", "quit", "event", "error"):
                 self.q.put((kind, args))
                 if kind == "event" and args:  # boční tlačítka a palcové kolečko: stejná záře jako u testeru
@@ -164,14 +167,118 @@ class App(gui4.App):
     def _dpi_cancel(self):
         pass
 
+    # ================================================================ výběr myši
+    def _dev_name(self, path):
+        cache = self.__dict__.setdefault("_dev_names", {})
+        if path not in cache:
+            cache[path] = DV.friendly_name(path) or DV.device_id(path)
+        return cache[path]
+
+    def _conn_text(self, path):
+        return t({"bt": "conn_bt", "usb": "conn_usb", "builtin": "conn_builtin"}[DV.connection(path)])
+
     def _update_dev_label(self):
         mice = E.connected_mice(self.cfg.get("device_match", ""))
         if mice:
-            kinds = sorted({t("conn_bt") if E.is_bluetooth(m) else t("conn_usb") for m in mice})
-            text = f"{t('dev_ok')} ({', '.join(kinds)})"
+            names = []
+            for m in mice:
+                s = f"{self._dev_name(m)} ({self._conn_text(m)})"
+                if s not in names:
+                    names.append(s)
+            text = f"● {', '.join(names)}  ·  {t('dev_change')}"
         else:
-            text = t("dev_missing")
-        self.dev_lbl.configure(text=text, fg=self.T["ok"] if mice else self.T["warn"])
+            text = f"{t('dev_missing')}  ·  {t('dev_choose')}"
+        self.dev_lbl.configure(text=text, fg=self.T["ok"] if mice else self.T["warn"], cursor="hand2")
+        if not getattr(self, "_dev_lbl_bound", False):
+            self.dev_lbl.bind("<Button-1>", lambda e: self.open_device_dialog())
+            self._dev_lbl_bound = True
+        return bool(mice)
+
+    def open_device_dialog(self):
+        if getattr(self, "_dev_dlg", None) is not None and self._dev_dlg.winfo_exists():
+            self._dev_dlg.lift()
+            return
+        T, px = self.T, self.px
+        dlg = tk.Toplevel(self.root, bg=T["panel"])
+        self._dev_dlg = dlg
+        dlg.title(t("dev_title"))
+        dlg.transient(self.root)
+        dlg.geometry(f"{px(580)}x{px(540)}")
+        dlg.after(10, lambda: self._titlebar(dlg))
+        head = tk.Frame(dlg, bg=T["panel"])
+        head.pack(fill="x", padx=px(22), pady=(px(18), px(6)))
+        self.label(head, t("dev_title"), 14, True).pack(anchor="w")
+        self.label(head, t("dev_sub"), 9, fg=T["sub"], wraplength=px(530), justify="left").pack(anchor="w")
+        bar = tk.Frame(dlg, bg=T["panel"])
+        bar.pack(side="bottom", fill="x", padx=px(22), pady=px(16))
+        det = tk.Frame(dlg, bg=T["panel"])
+        det.pack(side="bottom", fill="x", padx=px(22))
+        self._dev_list = ScrollList(dlg, T["panel"], px(20))
+        self._dev_list.cv.pack(fill="both", expand=True, padx=px(10), pady=(px(6), px(6)))
+
+        match = self.cfg.get("device_match", [])
+        match = [match] if isinstance(match, str) else list(match)
+        self._dev_info = {}  # id -> (název, připojení nebo None = nepřipojená)
+        for p in E.connected_mice(["hid"]):
+            self._dev_info.setdefault(DV.device_id(p), (self._dev_name(p), self._conn_text(p)))
+        for mid in match:
+            if mid.upper() not in self._dev_info:
+                self._dev_info[mid.upper()] = (DV.KNOWN.get(mid.lower(), mid), None)
+        self._dev_state = {i: any(m.lower() in i.lower() for m in match) for i in self._dev_info}
+        self._fill_devices()
+
+        self.button(det, t("dev_detect"), self._dev_detect).pack(side="left")
+        self._dev_msg = self.label(det, "", 9, fg=T["sub"], wraplength=px(330), justify="left")
+        self._dev_msg.pack(side="left", padx=px(12))
+        self.button(bar, t("save"), self._dev_save, kind="primary").pack(side="right")
+        self.button(bar, t("cancel"), dlg.destroy, kind="ghost").pack(side="right", padx=px(8))
+        dlg.bind("<Destroy>", lambda e: e.widget is dlg and self.engine.post(E.WM_APP_IDENTIFY, 0))
+
+    def _fill_devices(self):
+        T, px = self.T, self.px
+        sl = self._dev_list
+        sl.clear()
+        for mid, (name, conn) in self._dev_info.items():
+            row = tk.Frame(sl.frame, bg=T["panel"])
+            row.pack(fill="x", padx=px(12), pady=px(4))
+            sw = Switch(row, self, self._dev_state.get(mid, False),
+                        lambda on, mid=mid: self._dev_state.__setitem__(mid, on))
+            sw.pack(side="right", padx=(px(10), 0))
+            tx = tk.Frame(row, bg=T["panel"])
+            tx.pack(side="left", fill="x", expand=True)
+            self.label(tx, name, 10, True, anchor="w").pack(anchor="w")
+            if conn:
+                sub = f"{conn}  ·  {mid}"
+            else:  # typ připojení odvodit z ID: VID_… = USB, VID&… = Bluetooth
+                kind = t("conn_usb") if "VID_" in mid else t("conn_bt") if "VID&" in mid else t("conn_builtin")
+                sub = f"{t('dev_not_connected')}  ·  {kind}  ·  {mid}"
+            self.label(tx, sub, 8, fg=T["sub"] if conn else T["warn"], anchor="w").pack(anchor="w")
+            tk.Frame(sl.frame, bg=T["border"], height=1).pack(fill="x", padx=px(12))
+
+    def _dev_detect(self):
+        self._dev_msg.configure(text=t("dev_detect_wait"), fg=self.T["text"])
+        self.engine.post(E.WM_APP_IDENTIFY, 1)
+
+    def _on_identify(self, path):
+        if getattr(self, "_dev_dlg", None) is None or not self._dev_dlg.winfo_exists():
+            return
+        mid = DV.device_id(path)
+        name = self._dev_name(path)
+        self._dev_info[mid] = (name, self._conn_text(path))
+        self._dev_state[mid] = True
+        self._fill_devices()
+        self._dev_msg.configure(text=t("dev_detected", name=name), fg=self.T["ok"])
+
+    def _dev_save(self):
+        sel = [i for i, on in self._dev_state.items() if on]
+        if not sel:
+            self._dev_msg.configure(text=t("dev_none"), fg=self.T["warn"])
+            return
+        self.cfg["device_match"] = sel
+        self.push_config()
+        self._update_dev_label()
+        self._dev_dlg.destroy()
+        self.status(t("dev_saved"))
 
     # ================================================================ rychlejší levý panel
     def refresh_apps(self):
@@ -490,6 +597,10 @@ class App(gui4.App):
         self.label(intro, t("win_title"), 17, True, bg=T["bg"]).pack(anchor="w")
         self.label(intro, t("win_intro2"), 9, fg=T["sub"], bg=T["bg"], wraplength=px(760),
                    justify="left").pack(anchor="w")
+        c = self._section(outer, t("sec_device"))
+        self._row(c, t("dev_row"), t("dev_row_sub"),
+                  lambda p: self.button(p, t("dev_btn"), self.open_device_dialog, kind="primary").pack(side="right"))
+
         c = self._section(outer, t("sec_pointer"))
         self._row(c, t("speed"), t("speed_sub"),
                   lambda p: Slider(p, self, 1, 20, v["speed"], lambda x: self._apply(WS.set_speed, x)).pack_with_value())
@@ -969,7 +1080,11 @@ class App(gui4.App):
         self._draw_job = self.root.after(45, self.draw)
 
     def show(self):
-        self._update_dev_label()
+        found = self._update_dev_label()
+        if not found and not getattr(self, "_dev_prompted", False):
+            # vybraná myš není připojená (např. jiný model než TK-MS029) -> rovnou nabídnout výběr
+            self._dev_prompted = True
+            self.root.after(400, self.open_device_dialog)
         self.sw_auto.set(gui4.G.autostart_get())
         self.root.deiconify()
         self._titlebar(self.root)

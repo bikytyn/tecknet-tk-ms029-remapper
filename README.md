@@ -4,8 +4,9 @@ Unofficial settings app for the **Tecknet TK-MS029** wireless mouse on Windows. 
 for this mouse, so its side buttons and thumb wheel can't be reassigned. This app adds that: remapping
 per application, with a settings window in the style of Logitech Options+.
 
-Only the Tecknet mouse is remapped. Other mice connected at the same time (a Logitech, for example) keep
-working as before.
+Only the mouse you select is remapped. Other mice connected at the same time (a Logitech, for example) keep
+working as before. The TK-MS029 is selected by default, via its USB receiver or Bluetooth. Any other mouse
+with standard side buttons or a horizontal wheel can be picked in the app.
 
 ![Settings window: photo of the mouse with a card for each control; the scroll wheel card is selected and its Windows settings are on the right](docs/window-wheel-settings.png)
 
@@ -14,6 +15,10 @@ working as before.
 - **Remap the side buttons (Back / Forward) and the thumb wheel (up / down)**: switch browser tabs,
   change volume, control media, use editing shortcuts, switch virtual desktops, run a custom keyboard
   shortcut or start a program or file.
+- **Choose which mouse to remap**: click the mouse name in the window header (or *More settings ›
+  Mouse*). The list shows the connected mice by name, for example "TK-MS029 BT1" or "MX Master 3S".
+  *Detect by pressing a button* selects the mouse whose side button you press. If the selected mouse
+  isn't connected when the window opens, the list opens by itself.
 - **Per-application profiles**: the action depends on the window in the foreground. Profiles you don't
   edit follow the default profile, *All applications*.
 - **Presets**: *Browser* (buttons switch tabs, wheel changes volume), *Media player* (buttons skip
@@ -82,9 +87,8 @@ Settings are saved automatically to `%APPDATA%\TecknetRemap\config.json`.
 - `profiles["*"]` is *All applications*. `profiles["brave.exe"]` and so on override only what they list.
 - Actions: `default`, `none`, `mouse:x1|x2|middle|hleft|hright`, `keys:ctrl+shift+t`,
   `run:C:\path\program.exe`.
-- `device_match`: list of substrings of the HID device names to remap. Default:
-  `VID_25A7&PID_FA61` (USB receiver) and `VID&0225A7_PID&FAA0` (Bluetooth). Another mouse that sends
-  standard side-button events should work if you add its ID here.
+- `device_match`: IDs of the mice to remap, set by the mouse selection in the app. Default:
+  `VID_25A7&PID_FA61` (TK-MS029 USB receiver) and `VID&0225A7_PID&FAA0` (TK-MS029 over Bluetooth).
 - `debug: true` writes a log to `%APPDATA%\TecknetRemap\remap.log`.
 
 ## Known limitations
